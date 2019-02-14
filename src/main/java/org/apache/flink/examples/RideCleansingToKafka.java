@@ -43,17 +43,23 @@ import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
  */
 public class RideCleansingToKafka extends ExerciseBase {
 
-	private static final String LOCAL_KAFKA_BROKER = "10.0.1.25:9092,10.0.2.19:9092,10.0.0.138:9092";
-	public static final String CLEANSED_RIDES_TOPIC = "cleansedRides";
+	private static String LOCAL_KAFKA_BROKER = "10.0.1.25:9092,10.0.2.19:9092,10.0.0.138:9092";
+	public static String CLEANSED_RIDES_TOPIC = "cleansedRides";
 
 	public static void main(String[] args) throws Exception {
 
 		ParameterTool params = ParameterTool.fromArgs(args);
 		// final String input = params.get("input", pathToRideData);
-		String input = params.getRequired("input");	//
+		String input = params.getRequired("input");
+		System.out.println("Usage: RideCleasningToKafka " +"[--kafka-broker <server> --topic <string>]");
 
 		final int maxEventDelay = 60;       // events are out of order by max 60 seconds
 		final int servingSpeedFactor = 300; // events of 10 minute are served in 2 second
+
+		if (params.has("kafka-broker"))
+			LOCAL_KAFKA_BROKER = params.get("kafka-broker");
+		if (params.has("topic"))
+			CLEANSED_RIDES_TOPIC = params.get("topic");
 
 		// set up streaming execution environment
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

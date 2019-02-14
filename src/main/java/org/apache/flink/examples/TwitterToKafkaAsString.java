@@ -55,50 +55,47 @@ public class TwitterToKafkaAsString {
     // *************************************************************************
     // PROGRAM
     // *************************************************************************
-    private static final String LOCAL_KAFKA_BROKER = "10.0.1.25:9092,10.0.2.19:9092,10.0.0.138:9092";
-    public static final String CLEANSED_RIDES_TOPIC = "twitterText";
+    private static String LOCAL_KAFKA_BROKER = "10.0.1.25:9092,10.0.2.19:9092,10.0.0.138:9092";
+    public static String CLEANSED_RIDES_TOPIC = "twitterText";
 
     public static void main(String[] args) throws Exception {
 
         // Checking input parameters
         final ParameterTool params = ParameterTool.fromArgs(args);
-        System.out.println("Usage: TwitterExample [--output <path>] " +
-                "[--twitter-source.consumerKey <key> --twitter-source.consumerSecret <secret> --twitter-source.token <token> --twitter-source.tokenSecret <tokenSecret>]");
+        System.out.println("Usage: TwitterToKafkaAsString [--output <path>] " +
+                "[--twitter-source.consumerKey <key> --twitter-source.consumerSecret <secret> " +
+                "--twitter-source.token <token> --twitter-source.tokenSecret <tokenSecret>] " +
+                "[--kafka-broker <server> --topic <string>]");
 
         // set up the execution environment
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-
         // make parameters available in the web interface
         env.getConfig().setGlobalJobParameters(params);
-
         env.setParallelism(params.getInt("parallelism", 1));
+
+        if (params.has("kafka-broker"))
+            LOCAL_KAFKA_BROKER = params.get("kafka-broker");
+        if (params.has("topic"))
+            CLEANSED_RIDES_TOPIC = params.get("topic");
 
         DataStream<String> streamSource;
 
-        if (true) {
-            // get input data (Hard-coded version)
+        // get input data (From User's parameters)
+        if (params.has(TwitterSource.CONSUMER_KEY) &&
+                params.has(TwitterSource.CONSUMER_SECRET) &&
+                params.has(TwitterSource.TOKEN) &&
+                params.has(TwitterSource.TOKEN_SECRET)
+        ) {
+            streamSource = env.addSource(new TwitterSource(params.getProperties()));
+        } else {
+            System.out.println("Executing TwitterStream example with default props.");
+            // get default test text data
             Properties props = new Properties();
             props.setProperty(TwitterSource.CONSUMER_KEY, "blZVdNb6tLjEHeKDlq9wKvg5S");
             props.setProperty(TwitterSource.CONSUMER_SECRET, "9c3dSVLAloU0CGGP0ROj92AI2pcxhvFPf2uFJa3abdW7cXVxEq");
             props.setProperty(TwitterSource.TOKEN, "3879215892-sVF0AHCoVB3wJKkW7sPn6X8HFJKhNrklX4NctnE");
             props.setProperty(TwitterSource.TOKEN_SECRET, "c1uWi8y4DVCEPVEFVhQv1mQ5I3FU5OHgG87W39UmFn5Mr");
             streamSource = env.addSource(new TwitterSource(props));
-        } else {
-            // get input data (From User's parameters)
-            if (params.has(TwitterSource.CONSUMER_KEY) &&
-                    params.has(TwitterSource.CONSUMER_SECRET) &&
-                    params.has(TwitterSource.TOKEN) &&
-                    params.has(TwitterSource.TOKEN_SECRET)
-            ) {
-                System.out.println(params.getProperties());
-                streamSource = env.addSource(new TwitterSource(params.getProperties()));
-            } else {
-                System.out.println("Executing TwitterStream example with default props.");
-                System.out.println("Use --twitter-source.consumerKey <key> --twitter-source.consumerSecret <secret> " +
-                        "--twitter-source.token <token> --twitter-source.tokenSecret <tokenSecret> specify the authentication info.");
-                // get default test text data
-                streamSource = env.fromElements(TwitterExampleData.TEXTS);
-            }
         }
 
         DataStream<String> tweets = streamSource
@@ -109,7 +106,6 @@ public class TwitterToKafkaAsString {
                 LOCAL_KAFKA_BROKER,
                 CLEANSED_RIDES_TOPIC,
                 new SimpleStringSchema()));
-
 
         // execute program
         env.execute("Twitter Streaming Example");

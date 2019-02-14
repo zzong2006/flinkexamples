@@ -16,6 +16,7 @@
 
 package org.apache.flink.examples;
 
+import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.utils.TaxiRide;
 import org.apache.flink.utils.GeoUtils;
 import org.apache.flink.utils.TaxiRideSchema;
@@ -50,31 +51,32 @@ public class PopularPlacesFromKafka {
 	private static final String LOCAL_ZOOKEEPER_HOST = "10.0.1.188:2181,10.0.0.204:2181,10.0.2.107:2181";
 	private static final String LOCAL_KAFKA_BROKER = "10.0.1.25:9092,10.0.2.19:9092,10.0.0.138:9092";
 	private static final String RIDE_SPEED_GROUP = "rideSpeedGroup";
+	private static String CLEANSED_RIDES_TOPIC = "cleansedRides";
 	private static final int MAX_EVENT_DELAY = 60; // rides are at most 60 sec out-of-order.
 
 	public static void main(String[] args) throws Exception {
 
 		final int popThreshold = 20; // threshold for popular places
-
+		ParameterTool params = ParameterTool.fromArgs(args);
 		// set up streaming execution environment
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 		env.getConfig().setAutoWatermarkInterval(1000);
 
-		// configure the Kafka consumer
-		Properties kafkaProps = new Properties();
-		kafkaProps.setProperty("zookeeper.connect", LOCAL_ZOOKEEPER_HOST);
-		kafkaProps.setProperty("bootstrap.servers", LOCAL_KAFKA_BROKER);
-		kafkaProps.setProperty("group.id", RIDE_SPEED_GROUP);
-		// always read the Kafka topic from the start
-		kafkaProps.setProperty("auto.offset.reset", "earliest");
+		System.out.println("Usage : PopularPlcaesFromKafka --zookeeper.connect <zookeeper> --bootstrap.servers <brokers>" +
+				" --group.id <String> --topic <String> --output <path>");
+
+		if (params.has("topic"))
+			CLEANSED_RIDES_TOPIC = params.get("topic");
 
 		// create a Kafka consumer
 		FlinkKafkaConsumer<TaxiRide> consumer = new FlinkKafkaConsumer<>(
-				"cleansedRides",
+				CLEANSED_RIDES_TOPIC,
 				new TaxiRideSchema(),
-				kafkaProps);
+				params.getProperties());
 		// assign a timestamp extractor to the consumer
+		consumer.setStartFromGroupOffsets();		// Default
+		// consumer.setStartFromEarliest();     // start from the earliest record possible
 		consumer.assignTimestampsAndWatermarks(new TaxiRideTSExtractor());
 
 		// create a TaxiRide data stream
@@ -95,7 +97,13 @@ public class PopularPlacesFromKafka {
 				// map grid cell to coordinates
 				.map(new GridToCoordinates());
 
-		popularPlaces.print();
+		// emit result
+		if (params.has("output")) {
+			popularPlaces.writeAsText(params.get("output"));
+		} else {
+			System.out.println("Printing result to stdout. Use --output to specify output path.");
+			popularPlaces.print();
+		}
 
 		// execute the transformation pipeline
 		env.execute("Popular Places from Kafka");

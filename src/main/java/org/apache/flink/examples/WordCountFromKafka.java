@@ -60,6 +60,7 @@ public class WordCountFromKafka {
     private static final String LOCAL_ZOOKEEPER_HOST = "10.0.1.188:2181,10.0.0.204:2181,10.0.2.107:2181";
     private static final String LOCAL_KAFKA_BROKER = "10.0.1.25:9092,10.0.2.19:9092,10.0.0.138:9092";
     private static final String RIDE_SPEED_GROUP = "wordCountGroup";
+    private static String CLEANSED_RIDES_TOPIC = "cleansedRides";
     private static final int MAX_EVENT_DELAY = 60; // twits are at most 60 sec out-of-order.
 
     public static void main(String[] args) throws Exception {
@@ -69,24 +70,21 @@ public class WordCountFromKafka {
 
         // set up the execution environment
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        // env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+
+        System.out.println("Usage : WordCountFromKafka --zookeeper.connect <zookeeper> --bootstrap.servers <brokers>" +
+                " --group.id <String> --topic <String>");
 
         // make parameters available in the web interface
         env.getConfig().setGlobalJobParameters(params);
 
-        // configure the Kafka consumer
-        Properties kafkaProps = new Properties();
-        kafkaProps.setProperty("zookeeper.connect", LOCAL_ZOOKEEPER_HOST);
-        kafkaProps.setProperty("bootstrap.servers", LOCAL_KAFKA_BROKER);
-        kafkaProps.setProperty("group.id", RIDE_SPEED_GROUP);
-        // always read the Kafka topic from the start
-        kafkaProps.setProperty("auto.offset.reset", "earliest");
+        if (params.has("topic"))
+            CLEANSED_RIDES_TOPIC = params.get("topic");
 
         // create a Kafka consumer
         FlinkKafkaConsumer<String> consumer = new FlinkKafkaConsumer<>(
-                "twitterText",
+                CLEANSED_RIDES_TOPIC,
                 new SimpleStringSchema(),
-                kafkaProps);
+                params.getProperties());
 
         // get input data
         DataStream<String> text = env.addSource(consumer);

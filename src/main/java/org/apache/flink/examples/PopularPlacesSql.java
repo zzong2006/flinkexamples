@@ -29,11 +29,13 @@ import org.apache.flink.types.Row;
 
 public class PopularPlacesSql {
 
+    private static final int MAX_EVENT_DELAY = 60; // rides are at most 60 sec out-of-order.
+
     public static void main(String[] args) throws Exception {
 
         // read parameters
         ParameterTool params = ParameterTool.fromArgs(args);
-        final String input = params.get("input", ExerciseBase.pathToRideData);
+        final String input = params.getRequired("input");
 
         final int maxEventDelay = 60;       // events are out of order by max 60 seconds
         final int servingSpeedFactor = 600; // events of 10 minutes are served in 1 second
